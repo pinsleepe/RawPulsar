@@ -5,6 +5,7 @@ __author__ = 'monika'
 
 import math
 import struct
+import os.path
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -113,12 +114,7 @@ class RawPulsar:
         """
         return np.fft.ifft(x)
 
-    def add_pulsar(self,
-                   period_s=.1,
-                   duty_cycle=0.05,
-                   # dm=5.,
-                   # snr = 1.
-                   ):
+    def add_pulsar(self, duty_cycle=0.05):
         """
 
         :param period_s: the time between two pulses
@@ -136,31 +132,41 @@ class RawPulsar:
             x = self.ifft(X)*lfft
             self.raw_data[(k-1)*lfft:k*lfft] = x
 
-    def write_file(self, file_name='test'):
+    def write_file(self, file_name='test', path_name=False):
         """
 
         :param file_name:
         :return:
         """
+        if path_name != False:
+            completeName = os.path.join(path_name, file_name)
+        else:
+            completeName = file_name
         xs = self.raw_data
         p_amp = 1  # amplitude of the pulse in time domain
         max_xs = max(np.absolute(xs))
-        with open(file_name, 'ab') as myfile:
+        with open(completeName, 'ab') as myfile:
             for l in range(len(xs)):
                 xr = int(round(10*(p_amp*np.real(xs[l])/max_xs+np.random.standard_normal())))
                 xi = int(round(10*(p_amp*np.imag(xs[l])/max_xs+np.random.standard_normal())))
                 mybuffer = struct.pack("bb", xr, xi)
                 myfile.write(mybuffer)
+                # hardcoded 1M file size
+                if os.stat(completeName).st_size > 1024*1024:
+                    break
 
-    def plot(self, file_name='test'):
+    def plot(self, file_name='test', path_name=False):
         """
 
         :param file_name:
         :return:
         """
-        with open(file_name, 'rb') as fh:
+        if path_name != False:
+            completeName = os.path.join(path_name, file_name)
+        else:
+            completeName = file_name
+        with open(completeName, 'rb') as fh:
             loaded_array = np.frombuffer(fh.read(), dtype=np.int8)
-
         xr = loaded_array[0:len(loaded_array)-1:2]
         xi = loaded_array[1:len(loaded_array):2]
         cX = xr + xi*1j
@@ -172,7 +178,7 @@ class RawPulsar:
         for p in range(len(cX)/lfft):
             power = np.abs(np.fft.fft(cX[(p1-1)*lfft:p1*lfft], lfft))**2
             p1 += 1
-            print 'p1 = %d' % p1
+            # print 'p1 = %d' % p1
             power_array[:, p] = power
         power_array = np.fliplr(power_array)
 
@@ -188,7 +194,9 @@ if __name__ == '__main__':
     rP.initialise_data(dm=5.)
     print 'Start frequency              f1 = %.2e' % rP.fch1
     print 'FFT blocks to process        kmax = %d' % rP.fft_blocks
-    rP.add_pulsar(period_s=.1, duty_cycle=0.05)
-    rP.write_file('test_2')
-    rP.plot('test_2')
+    rP.add_pulsar(duty_cycle=0.05)
+    rP.write_file('test_2', path_name='/media/monika/2c0fa990-34fc-46d7-bee5-f9bd0ac5fe8d/dbertsc_home/scripts')
+    print 'File size %f' % os.stat('/media/monika/2c0fa990-34fc-46d7-bee5-f9bd0ac5fe8d/'
+                                   'dbertsc_home/scripts/test_2').st_size
+    rP.plot('test_2', path_name='/media/monika/2c0fa990-34fc-46d7-bee5-f9bd0ac5fe8d/dbertsc_home/scripts')
 
